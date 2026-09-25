@@ -11,6 +11,7 @@ import {
 } from '@/lib/api/register-account';
 
 import { useCsrf } from '../hooks/use-csrf';
+import { getAuthErrorMessage } from '../utils/get-auth-error-message';
 import styles from './auth-form.module.css';
 
 export function RegisterForm() {
@@ -27,6 +28,7 @@ export function RegisterForm() {
             return registerAccount(input, token);
         },
         retry: false,
+        networkMode: 'always',
         gcTime: 0,
         onSuccess: async (context) => {
             queryClient.setQueryData(['auth', 'me'], context);
@@ -36,9 +38,10 @@ export function RegisterForm() {
         },
         onError: async (error) => {
             setErrorMessage(
-                error instanceof ApiError
-                    ? error.message
-                    : 'Não foi possível concluir o cadastro. Verifique sua conexão e tente novamente.',
+                getAuthErrorMessage(
+                    error,
+                    'Não foi possível concluir o cadastro. Tente novamente.',
+                ),
             );
 
             if (
@@ -48,9 +51,12 @@ export function RegisterForm() {
             ) {
                 try {
                     await csrf.refreshToken();
-                } catch {
+                } catch (refreshError) {
                     setErrorMessage(
-                        'Não foi possível preparar uma nova tentativa. Tente novamente em alguns instantes.',
+                        getAuthErrorMessage(
+                            refreshError,
+                            'Não foi possível preparar uma nova tentativa. Tente novamente em alguns instantes.',
+                        ),
                     );
                 }
             }
@@ -100,7 +106,10 @@ export function RegisterForm() {
     const visibleError =
         errorMessage ??
         (csrf.error
-            ? 'Não foi possível preparar o cadastro. Tente novamente.'
+            ? getAuthErrorMessage(
+                  csrf.error,
+                  'Não foi possível preparar o cadastro. Tente novamente.',
+              )
             : null);
 
     return (
@@ -182,7 +191,9 @@ export function RegisterForm() {
                       ? 'Criando conta...'
                       : csrf.isFetching
                         ? 'Preparando...'
-                        : 'Criar conta'}
+                        : visibleError
+                          ? 'Tentar novamente'
+                          : 'Criar conta'}
             </button>
         </form>
     );

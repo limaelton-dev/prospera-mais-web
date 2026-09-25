@@ -8,6 +8,7 @@ import { logout } from '@/lib/api/logout';
 
 import { authenticatedContextQueryOptions } from '../hooks/use-authenticated-context';
 import { useCsrf } from '../hooks/use-csrf';
+import { getAuthErrorMessage } from '../utils/get-auth-error-message';
 import formStyles from './auth-form.module.css';
 import styles from './logout-button.module.css';
 
@@ -47,11 +48,10 @@ export function LogoutButton() {
             }
 
             setErrorMessage(
-                error instanceof ApiError
-                    ? error.message
-                    : error instanceof TypeError
-                      ? 'Não foi possível conectar ao servidor.'
-                      : 'Não foi possível sair. Tente novamente.',
+                getAuthErrorMessage(
+                    error,
+                    'Não foi possível sair. Tente novamente.',
+                ),
             );
 
             if (
@@ -61,9 +61,12 @@ export function LogoutButton() {
             ) {
                 try {
                     await csrf.refreshToken();
-                } catch {
+                } catch (refreshError) {
                     setErrorMessage(
-                        'Não foi possível preparar uma nova tentativa. Tente novamente em alguns instantes.',
+                        getAuthErrorMessage(
+                            refreshError,
+                            'Não foi possível preparar uma nova tentativa. Tente novamente em alguns instantes.',
+                        ),
                     );
                 }
             }
@@ -87,7 +90,10 @@ export function LogoutButton() {
     const visibleError =
         errorMessage ??
         (csrf.error
-            ? 'Não foi possível preparar a saída. Tente novamente.'
+            ? getAuthErrorMessage(
+                  csrf.error,
+                  'Não foi possível preparar a saída. Tente novamente.',
+              )
             : null);
 
     return (

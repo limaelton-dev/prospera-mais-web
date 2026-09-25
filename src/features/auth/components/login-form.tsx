@@ -8,6 +8,7 @@ import { ApiError } from '@/lib/api/api-error';
 import { login, type LoginInput } from '@/lib/api/login';
 
 import { useCsrf } from '../hooks/use-csrf';
+import { getAuthErrorMessage } from '../utils/get-auth-error-message';
 import styles from './auth-form.module.css';
 
 export function LoginForm() {
@@ -24,6 +25,7 @@ export function LoginForm() {
             return login(input, token);
         },
         retry: false,
+        networkMode: 'always',
         gcTime: 0,
         onSuccess: async (context) => {
             queryClient.setQueryData(['auth', 'me'], context);
@@ -33,11 +35,10 @@ export function LoginForm() {
         },
         onError: async (error) => {
             setErrorMessage(
-                error instanceof ApiError
-                    ? error.message
-                    : error instanceof TypeError
-                      ? 'Não foi possível conectar ao servidor.'
-                      : 'Não foi possível entrar. Tente novamente.',
+                getAuthErrorMessage(
+                    error,
+                    'Não foi possível entrar. Tente novamente.',
+                ),
             );
 
             if (
@@ -47,9 +48,12 @@ export function LoginForm() {
             ) {
                 try {
                     await csrf.refreshToken();
-                } catch {
+                } catch (refreshError) {
                     setErrorMessage(
-                        'Não foi possível preparar uma nova tentativa. Tente novamente em alguns instantes.',
+                        getAuthErrorMessage(
+                            refreshError,
+                            'Não foi possível preparar uma nova tentativa. Tente novamente em alguns instantes.',
+                        ),
                     );
                 }
             }
@@ -86,7 +90,10 @@ export function LoginForm() {
     const visibleError =
         errorMessage ??
         (csrf.error
-            ? 'Não foi possível preparar o login. Tente novamente.'
+            ? getAuthErrorMessage(
+                  csrf.error,
+                  'Não foi possível preparar o login. Tente novamente.',
+              )
             : null);
 
     return (
@@ -143,7 +150,9 @@ export function LoginForm() {
                       ? 'Entrando...'
                       : csrf.isFetching
                         ? 'Preparando...'
-                        : 'Entrar'}
+                        : visibleError
+                          ? 'Tentar novamente'
+                          : 'Entrar'}
             </button>
         </form>
     );
