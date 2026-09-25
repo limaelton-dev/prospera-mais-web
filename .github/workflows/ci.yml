@@ -1,0 +1,53 @@
+name: Web CI
+
+on:
+    push:
+        branches:
+            - main
+            - 'card/**'
+    pull_request:
+        branches:
+            - main
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    checks:
+        name: Web checks
+        runs-on: ubuntu-24.04
+        timeout-minutes: 15
+
+        env:
+            NEXT_PUBLIC_API_URL: http://localhost:3001/v2
+
+        steps:
+            - name: Obter o código
+              uses: actions/checkout@v7
+              with:
+                  persist-credentials: false
+
+            - name: Preparar Node
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+
+            - name: Instalar dependências
+              run: npm ci
+
+            - name: Lint
+              run: npm run lint
+
+            - name: Formatação
+              run: npm run format:check
+
+            - name: Tipos
+              run: npm run typecheck
+
+            - name: Build
+              run: npm run build

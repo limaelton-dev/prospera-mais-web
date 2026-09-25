@@ -1,0 +1,48 @@
+.shell {
+    min-height: 100svh;
+}
+
+.header {
+    border-bottom: 1px solid #cbd5e1;
+    background: #ffffff;
+}
+
+.headerContent {
+    width: min(100%, 64rem);
+    margin-inline: auto;
+    padding: 1.25rem 1.5rem;
+}
+
+.brand {
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.content {
+    width: min(100%, 64rem);
+    margin-inline: auto;
+    padding: 3rem 1.5rem;
+}
+
+.spaceLabel {
+    display: inline-block;
+    margin: 0 0 1.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 9999px;
+    background: #dbeafe;
+    color: #1e40af;
+    font-weight: 600;
+}
+
+.title {
+    margin: 0 0 1rem;
+    font-size: clamp(1.75rem, 5vw, 2.5rem);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.description {
+    margin: 0;
+    color: #475569;
+    line-height: 1.6;
+}
