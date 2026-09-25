@@ -1,0 +1,6 @@
+.actions {
+    display: grid;
+    gap: 1rem;
+    justify-items: start;
+    margin-top: 1.5rem;
+}

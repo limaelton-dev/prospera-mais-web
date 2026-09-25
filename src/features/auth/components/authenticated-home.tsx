@@ -2,6 +2,7 @@
 
 import { useAuthenticatedContext } from '../hooks/use-authenticated-context';
 import styles from './authenticated-shell.module.css';
+import { LogoutButton } from './logout-button';
 
 export function AuthenticatedHome() {
     const { data: context } = useAuthenticatedContext({ enabled: false });
@@ -21,6 +22,8 @@ export function AuthenticatedHome() {
             <p className={styles.description}>
                 Seu espaço pessoal está pronto.
             </p>
+
+            <LogoutButton />
         </section>
     );
 }

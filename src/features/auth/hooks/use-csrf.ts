@@ -8,6 +8,7 @@ const csrfQueryOptions = queryOptions({
     queryFn: ({ signal }) => getCsrfToken(signal),
     staleTime: Infinity,
     retry: false,
+    networkMode: 'always',
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
 });
