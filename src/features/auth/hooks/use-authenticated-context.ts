@@ -1,11 +1,12 @@
-'use-client';
+'use client';
 
-import { getAuthenticatedContex } from '@/lib/api/get-authenticated-context';
 import { queryOptions, useQuery } from '@tanstack/react-query';
+
+import { getAuthenticatedContext } from '@/lib/api/get-authenticated-context';
 
 export const authenticatedContextQueryOptions = queryOptions({
     queryKey: ['auth', 'me'],
-    queryFn: ({ signal }) => getAuthenticatedContex(signal),
+    queryFn: ({ signal }) => getAuthenticatedContext(signal),
     staleTime: 0,
     retry: false,
     networkMode: 'always',
@@ -14,6 +15,15 @@ export const authenticatedContextQueryOptions = queryOptions({
     refetchOnReconnect: true,
 });
 
-export function useAuthenticatedContext() {
-    return useQuery(authenticatedContextQueryOptions);
+type UseAuthenticatedContextOptions = {
+    enabled?: boolean;
+};
+
+export function useAuthenticatedContext({
+    enabled = true,
+}: UseAuthenticatedContextOptions = {}) {
+    return useQuery({
+        ...authenticatedContextQueryOptions,
+        enabled,
+    });
 }
