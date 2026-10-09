@@ -7,11 +7,13 @@ type ApiRequestOptions = {
           method?: 'GET';
           body?: never;
           csrfToken?: never;
+          idempotencyKey?: never;
       }
     | {
           method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
           body?: unknown;
           csrfToken: string;
+          idempotencyKey?: string;
       }
 );
 
@@ -47,6 +49,14 @@ export async function apiRequest<T = unknown>(
         }
 
         headers.set('X-CSRF-Token', options.csrfToken);
+
+        if (options.idempotencyKey !== undefined) {
+            if (!options.idempotencyKey) {
+                throw new Error('Informe a chave idempotente da operação.');
+            }
+
+            headers.set('Idempotency-Key', options.idempotencyKey);
+        }
     }
 
     const response = await fetch(baseUrl + path, {

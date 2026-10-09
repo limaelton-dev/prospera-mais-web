@@ -1,0 +1,144 @@
+.stack {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.stack h1,
+.stack h2,
+.stack p {
+    margin: 0;
+}
+
+.title {
+    font-size: clamp(1.75rem, 5vw, 2.5rem);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.panel {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+    padding: 1.25rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    overflow-wrap: anywhere;
+}
+
+.list {
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.spaceName {
+    color: #1d4ed8;
+    font-size: 1.125rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.input {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.75rem;
+    padding: 0.75rem;
+    border: 1px solid #64748b;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.actions,
+.navigation {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.navigation {
+    margin-bottom: 2rem;
+}
+
+.navigation a {
+    padding-block: 0.5rem;
+    color: #1d4ed8;
+}
+
+.button,
+.secondary {
+    width: fit-content;
+    min-height: 2.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.button {
+    background: #1d4ed8;
+    color: #ffffff;
+}
+
+.secondary {
+    border-color: #64748b;
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.button:disabled,
+.secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.input:focus-visible,
+.button:focus-visible,
+.secondary:focus-visible,
+.navigation a:focus-visible,
+.spaceName:focus-visible {
+    outline: 3px solid #2563eb;
+    outline-offset: 3px;
+}
+
+.error {
+    color: #b91c1c;
+    line-height: 1.5;
+}
+
+.muted {
+    color: #475569;
+    line-height: 1.5;
+}
+
+.dialog {
+    width: min(32rem, calc(100% - 2rem));
+    max-height: calc(100svh - 2rem);
+    padding: 1.5rem;
+    border: 1px solid #94a3b8;
+    border-radius: 0.75rem;
+    color: #0f172a;
+    background: #ffffff;
+}
+
+.dialog::backdrop {
+    background: rgb(15 23 42 / 55%);
+}
+
+@media (max-width: 36rem) {
+    .actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .actions .button,
+    .actions .secondary {
+        width: 100%;
+    }
+}

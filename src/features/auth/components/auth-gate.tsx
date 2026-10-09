@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { Fragment, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useAuthenticatedContext } from '../hooks/use-authenticated-context';
@@ -85,5 +85,5 @@ export function AuthGate({ children }: AuthGateProps) {
         );
     }
 
-    return <>{children}</>;
+    return <Fragment key={auth.data?.person.id}>{children}</Fragment>;
 }

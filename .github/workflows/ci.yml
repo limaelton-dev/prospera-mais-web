@@ -5,6 +5,7 @@ on:
         branches:
             - main
             - 'card/**'
+            - 'card-*'
     pull_request:
         branches:
             - main

@@ -6,9 +6,10 @@ import {
     QueryClientProvider,
 } from '@tanstack/react-query';
 import { ReactNode } from 'react';
+import { watchSpacesSession } from '@/features/spaces/cache/spaces-session';
 
 function createQueryClient() {
-    return new QueryClient({
+    const client = new QueryClient({
         defaultOptions: {
             queries: {
                 retry: false,
@@ -18,6 +19,12 @@ function createQueryClient() {
             },
         },
     });
+
+    if (!environmentManager.isServer()) {
+        watchSpacesSession(client);
+    }
+
+    return client;
 }
 
 let browserQueryClient: QueryClient | undefined;
