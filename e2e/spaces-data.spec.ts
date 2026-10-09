@@ -258,3 +258,56 @@ test('somente 401 da pessoa atual encerra a sessão', async () => {
         client.clear();
     }
 });
+
+test('cancela consulta pendente ao trocar de pessoa', async () => {
+    const client = new QueryClient();
+    const stop = watchSpacesSession(client);
+
+    let resolveRequest!: (value: { items: string[] }) => void;
+    let markStarted!: () => void;
+    let aborted = false;
+
+    const response = new Promise<{ items: string[] }>((resolve) => {
+        resolveRequest = resolve;
+    });
+
+    const started = new Promise<void>((resolve) => {
+        markStarted = resolve;
+    });
+
+    try {
+        client.setQueryData(['auth', 'me'], context('a'));
+
+        const pending = client
+            .query({
+                queryKey: spacesQueryKeys.list('a'),
+                retry: false,
+                networkMode: 'always',
+                queryFn: ({ signal }) => {
+                    signal.addEventListener('abort', () => {
+                        aborted = true;
+                    });
+
+                    markStarted();
+                    return response;
+                },
+            })
+            .catch(() => undefined);
+
+        await started;
+
+        client.setQueryData(['auth', 'me'], context('b'));
+
+        expect(aborted).toBe(true);
+        expect(client.getQueryData(spacesQueryKeys.list('a'))).toBeUndefined();
+
+        resolveRequest({ items: ['resposta antiga'] });
+        await pending;
+
+        expect(client.getQueryData(spacesQueryKeys.list('a'))).toBeUndefined();
+        expect(client.getQueryData(['auth', 'me'])).toEqual(context('b'));
+    } finally {
+        stop();
+        client.clear();
+    }
+});
