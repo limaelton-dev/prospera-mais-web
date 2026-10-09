@@ -12,6 +12,8 @@ import {
 
 import { useCsrf } from '../hooks/use-csrf';
 import { getAuthErrorMessage } from '../utils/get-auth-error-message';
+import { setAuthenticatedContext } from '../utils/set-authenticated-context';
+
 import styles from './auth-form.module.css';
 
 export function RegisterForm() {
@@ -31,7 +33,7 @@ export function RegisterForm() {
         networkMode: 'always',
         gcTime: 0,
         onSuccess: async (context) => {
-            queryClient.setQueryData(['auth', 'me'], context);
+            await setAuthenticatedContext(queryClient, context);
             await csrf.invalidateToken();
             formRef.current?.reset();
             router.replace('/');
