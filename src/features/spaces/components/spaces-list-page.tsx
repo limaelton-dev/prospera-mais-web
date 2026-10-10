@@ -7,6 +7,7 @@ import { useAuthenticatedContext } from '@/features/auth/hooks/use-authenticated
 import { useSpaces } from '../hooks/use-spaces';
 import { getSpacesErrorMessage } from '../utils/get-spaces-error-message';
 import styles from './spaces.module.css';
+import { useSpaceContext } from '../hooks/use-space-context';
 
 const statuses = {
     ACTIVE: 'Ativo',
@@ -17,6 +18,7 @@ const statuses = {
 export function SpacesListPage() {
     const auth = useAuthenticatedContext({ enabled: false });
     const query = useSpaces(auth.data?.person.id ?? null);
+    const context = useSpaceContext();
 
     if (!auth.data) {
         return null;
@@ -61,6 +63,11 @@ export function SpacesListPage() {
                                 <Link
                                     href={`/spaces/${space.id}`}
                                     className={styles.spaceName}
+                                    aria-current={
+                                        context.activeSpaceId === space.id
+                                            ? 'true'
+                                            : undefined
+                                    }
                                 >
                                     {space.label}
                                 </Link>
@@ -72,6 +79,9 @@ export function SpacesListPage() {
                                     {' · '}
                                     {statuses[space.status]}
                                 </p>
+                                {context.activeSpaceId === space.id && (
+                                    <p>Espaço selecionado</p>
+                                )}
                             </li>
                         ))}
                     </ul>
