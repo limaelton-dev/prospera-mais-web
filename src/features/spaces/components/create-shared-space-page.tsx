@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, type SubmitEvent } from 'react';
+import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 
 import { useAuthenticatedContext } from '@/features/auth/hooks/use-authenticated-context';
 
@@ -11,10 +11,14 @@ import type { InvitationCommandResponse } from '../types/spaces-responses';
 import { validateSpaceName } from '../utils/validate-space-name';
 import { InvitationLink } from './invitation-link';
 import styles from './spaces.module.css';
+import { useSpaceContext } from '../hooks/use-space-context';
+import { useSpaceContextInstance } from '../context/space-context-provider';
 
 export function CreateSharedSpacePage() {
     const router = useRouter();
     const auth = useAuthenticatedContext({ enabled: false });
+    const context = useSpaceContext();
+    const selection = useSpaceContextInstance();
     const nameInput = useRef<HTMLInputElement>(null);
 
     const [name, setName] = useState('');
@@ -24,6 +28,16 @@ export function CreateSharedSpacePage() {
     );
 
     const command = useSpaceCommand(auth.data?.person.id ?? null, setResult);
+    useEffect(() => {
+        let generation = selection.getSnapshot().generation;
+        return selection.subscribe(() => {
+            const next = selection.getSnapshot().generation;
+            if (next === generation) return;
+            generation = next;
+            setResult(null);
+        });
+    }, [selection]);
+    const contextBusy = context.phase !== 'ready';
 
     function submit(event: SubmitEvent<HTMLFormElement>): void {
         event.preventDefault();
@@ -142,7 +156,7 @@ export function CreateSharedSpacePage() {
                         <button
                             type="button"
                             className={styles.button}
-                            disabled={command.isPending}
+                            disabled={command.isPending || contextBusy}
                             onClick={command.retry}
                         >
                             Tentar novamente
@@ -151,7 +165,7 @@ export function CreateSharedSpacePage() {
                         <button
                             type="submit"
                             className={styles.button}
-                            disabled={command.isPending}
+                            disabled={command.isPending || contextBusy}
                         >
                             {command.isPending ? 'Criando...' : 'Criar espaço'}
                         </button>

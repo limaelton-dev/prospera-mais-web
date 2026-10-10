@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useAuthenticatedContext } from '@/features/auth/hooks/use-authenticated-context';
 import { ApiError } from '@/lib/api/api-error';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { useSpaceCommand, type SpaceWrite } from '../hooks/use-space-command';
 import { useSpaceDetails } from '../hooks/use-space-details';
@@ -11,6 +12,8 @@ import type { InvitationCommandResponse } from '../types/spaces-responses';
 import { getSpacesErrorMessage } from '../utils/get-spaces-error-message';
 import { InvitationLink } from './invitation-link';
 import styles from './spaces.module.css';
+import { useSpaceContextInstance } from '../context/space-context-provider';
+import { isSpaceAccessDenied } from '../state/space-context';
 
 const spaceStatuses = {
     ACTIVE: 'Ativo',
@@ -56,6 +59,16 @@ function SpaceDetails({
     spaceId: string;
 }) {
     const query = useSpaceDetails(personId, spaceId);
+    const router = useRouter();
+    const pathname = usePathname();
+    const currentPath = useRef(pathname);
+    useLayoutEffect(() => {
+        currentPath.current = pathname;
+        return () => {
+            currentPath.current = '';
+        };
+    }, [pathname]);
+    const context = useSpaceContextInstance();
     const dialog = useRef<HTMLDialogElement>(null);
     const cancelButton = useRef<HTMLButtonElement>(null);
 
@@ -69,6 +82,33 @@ function SpaceDetails({
     const expiresAt = invitation?.expiresAt;
     const invitationStatus = invitation?.status;
     const { refetch, dataUpdatedAt } = query;
+    useEffect(() => {
+        let generation = context.getSnapshot().generation;
+        return context.subscribe(() => {
+            const next = context.getSnapshot().generation;
+            if (next === generation) return;
+            generation = next;
+            setIssued(null);
+            setReplacement(null);
+            dialog.current?.close();
+        });
+    }, [context]);
+
+    useEffect(() => {
+        if (!isSpaceAccessDenied(query.error)) return;
+        const fallback = context.accessLost(spaceId);
+        const generation = context.getSnapshot().generation;
+        void fallback.then((recovered) => {
+            const snapshot = context.getSnapshot();
+            if (
+                recovered &&
+                currentPath.current === `/spaces/${spaceId}` &&
+                snapshot.generation === generation &&
+                snapshot.activeSpaceId
+            )
+                router.replace(`/spaces/${snapshot.activeSpaceId}`);
+        });
+    }, [context, query.error, router, spaceId]);
 
     useEffect(() => {
         if (!expiresAt || invitationStatus !== 'PENDING') {
@@ -140,7 +180,7 @@ function SpaceDetails({
         query.error instanceof ApiError &&
         [401, 403, 404].includes(query.error.status);
 
-    if (!query.data || accessDenied) {
+    if (!query.data || accessDenied || query.isError) {
         return (
             <section className={styles.stack}>
                 <h1 className={styles.title}>Espaço indisponível</h1>

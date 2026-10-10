@@ -12,6 +12,7 @@ export type SpaceContextCapture = {
 };
 
 export type SpaceContextSnapshot = {
+    initialized: boolean;
     phase: 'initializing' | 'switching' | 'ready' | 'error' | 'session';
     generation: number;
     currentSpace: SpaceSummary | null;
@@ -19,6 +20,7 @@ export type SpaceContextSnapshot = {
     items: SpaceSummary[];
     message: string | null;
     switchBlocked: boolean;
+    routeIssue: { spaceId: string; message: string } | null;
 };
 
 export type SpaceContextTransport = {
@@ -41,6 +43,7 @@ export type SpaceContextTransport = {
 };
 
 const empty: SpaceContextSnapshot = {
+    initialized: false,
     phase: 'initializing',
     generation: 0,
     currentSpace: null,
@@ -48,6 +51,7 @@ const empty: SpaceContextSnapshot = {
     items: [],
     message: null,
     switchBlocked: false,
+    routeIssue: null,
 };
 export const unavailableSpaceMessage =
     'Este espaço não está mais disponível. Você voltou para Meu espaço.';
@@ -71,6 +75,8 @@ export class SpaceContext {
     private retryTarget: string | null = null;
     private retryLoadList = true;
     private retryMessage: string | null = null;
+    private retryRoute = false;
+    private lastSpace: SpaceSummary | null = null;
 
     constructor(
         readonly personId: string,
@@ -101,6 +107,7 @@ export class SpaceContext {
     clear(): void {
         this.cancel();
         this.locks.clear();
+        this.lastSpace = null;
         this.transport.preference.clear(this.personId);
         this.update({ ...empty, phase: 'session' });
     }
@@ -140,9 +147,11 @@ export class SpaceContext {
             this.retryTarget,
             this.retryLoadList,
             this.retryMessage,
+            this.retryRoute,
         );
     }
     select(spaceId: string): Promise<boolean> {
+        if (!this.transport.isSessionCurrent()) return Promise.resolve(false);
         if (this.locks.size > 0) return Promise.resolve(false);
         if (
             this.snapshot.phase === 'ready' &&
@@ -152,7 +161,40 @@ export class SpaceContext {
         return this.transition(spaceId, false);
     }
 
+    visit(spaceId: string): Promise<boolean> {
+        if (this.locks.size > 0) return Promise.resolve(false);
+        return this.transition(
+            spaceId,
+            true,
+            this.snapshot.activeSpaceId === spaceId
+                ? this.snapshot.message
+                : null,
+            true,
+        );
+    }
+
+    updateList(items: SpaceSummary[]): void {
+        if (this.transport.isSessionCurrent()) this.update({ items });
+    }
+
+    updateCurrentSpace(space: SpaceSummary): void {
+        if (
+            this.transport.isSessionCurrent() &&
+            this.snapshot.phase === 'ready' &&
+            this.snapshot.activeSpaceId === space.id
+        ) {
+            this.lastSpace = space;
+            this.update({
+                currentSpace: space,
+                items: this.snapshot.items.map((item) =>
+                    item.id === space.id ? space : item,
+                ),
+            });
+        }
+    }
+
     async accessLost(spaceId: string): Promise<boolean> {
+        if (!this.transport.isSessionCurrent()) return false;
         this.transport.revoke(spaceId);
         if (this.snapshot.activeSpaceId !== spaceId) return false;
         return this.transition(
@@ -166,7 +208,9 @@ export class SpaceContext {
         target: string | null,
         loadList: boolean,
         message: string | null = null,
+        route = false,
     ): Promise<boolean> {
+        if (!this.transport.isSessionCurrent()) return false;
         this.cancel();
         this.transport.cancelDetails();
         const generation = this.generation;
@@ -177,6 +221,7 @@ export class SpaceContext {
         this.retryTarget = target;
         this.retryLoadList = loadList;
         this.retryMessage = message;
+        this.retryRoute = route;
         this.update({
             phase:
                 this.snapshot.phase === 'initializing'
@@ -185,6 +230,7 @@ export class SpaceContext {
             currentSpace: null,
             activeSpaceId: null,
             message: null,
+            routeIssue: null,
         });
         try {
             let items = this.snapshot.items;
@@ -209,8 +255,9 @@ export class SpaceContext {
                     : null;
             target ??= preference ?? personal.id;
             if (
-                !isSpaceId(target) ||
-                !items.some((space) => space.id === target)
+                !route &&
+                (!isSpaceId(target) ||
+                    !items.some((space) => space.id === target))
             ) {
                 this.transport.preference.clear(this.personId);
                 target = personal.id;
@@ -226,7 +273,11 @@ export class SpaceContext {
                 );
             } catch (error) {
                 if (!current()) return false;
-                if (!isSpaceAccessDenied(error) || target === personal.id)
+                if (
+                    (route && target !== this.lastSpace?.id) ||
+                    !isSpaceAccessDenied(error) ||
+                    target === personal.id
+                )
                     throw error;
                 this.transport.revoke(target);
                 this.retryLoadList = true;
@@ -261,8 +312,10 @@ export class SpaceContext {
                 );
             this.transport.publishDetail(details);
             this.transport.preference.write(this.personId, target);
+            this.lastSpace = details.space;
             this.update({
                 phase: 'ready',
+                initialized: true,
                 activeSpaceId: target,
                 currentSpace: details.space,
                 message,
@@ -273,6 +326,23 @@ export class SpaceContext {
             if (error instanceof ApiError && error.status === 401) {
                 this.clear();
                 this.transport.expireSession();
+            } else if (
+                route &&
+                isSpaceAccessDenied(error) &&
+                this.lastSpace &&
+                target !== this.lastSpace.id
+            ) {
+                this.transport.revoke(target!);
+                this.update({
+                    phase: 'ready',
+                    currentSpace: this.lastSpace,
+                    activeSpaceId: this.lastSpace.id,
+                    routeIssue: {
+                        spaceId: target!,
+                        message:
+                            'Espaço não encontrado ou indisponível para sua conta.',
+                    },
+                });
             } else {
                 this.update({
                     phase: 'error',

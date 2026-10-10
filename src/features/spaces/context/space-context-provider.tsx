@@ -21,6 +21,10 @@ import {
 import { spacesQueryKeys } from '../cache/spaces-query-keys';
 import { SpaceContext } from '../state/space-context';
 import { spacePreference } from '../state/space-preference';
+import type {
+    SpaceDetailsResponse,
+    SpaceSummary,
+} from '../types/spaces-responses';
 
 const Context = createContext<SpaceContext | null>(null);
 
@@ -124,31 +128,45 @@ function AuthenticatedSpaceContext({
     });
     useEffect(() => {
         void context.initialize();
-        return () => context.cancel();
-    }, [context]);
-    const snapshot = useSyncExternalStore(
-        context.subscribe,
-        context.getSnapshot,
-        context.getServerSnapshot,
-    );
-    return (
-        <Context.Provider value={context}>
-            {snapshot.phase === 'initializing' ? (
-                <p role="status" aria-busy="true">
-                    Carregando espaços…
-                </p>
-            ) : snapshot.phase === 'error' ? (
-                <section>
-                    <p role="alert">{snapshot.message}</p>
-                    <button type="button" onClick={() => void context.retry()}>
-                        Tentar novamente
-                    </button>
-                </section>
-            ) : snapshot.phase === 'session' ? null : (
-                children
-            )}
-        </Context.Provider>
-    );
+        const stop = client.getQueryCache().subscribe((event) => {
+            const key = event.query.queryKey;
+            if (
+                event.type === 'updated' &&
+                event.action.type === 'success' &&
+                key[0] === 'spaces' &&
+                key[1] === personId &&
+                key[2] === 'detail' &&
+                key[3] === context.getSnapshot().activeSpaceId &&
+                event.query.state.data
+            ) {
+                context.updateCurrentSpace(
+                    (event.query.state.data as SpaceDetailsResponse).space,
+                );
+            }
+            if (
+                event.type === 'updated' &&
+                event.action.type === 'success' &&
+                key[0] === 'spaces' &&
+                key[1] === personId &&
+                key[2] === 'list' &&
+                event.query.state.status === 'success' &&
+                event.query.state.data
+            ) {
+                context.updateList(
+                    (
+                        event.query.state.data as {
+                            items: SpaceSummary[];
+                        }
+                    ).items,
+                );
+            }
+        });
+        return () => {
+            stop();
+            context.cancel();
+        };
+    }, [client, context, personId]);
+    return <Context.Provider value={context}>{children}</Context.Provider>;
 }
 
 export function useSpaceContextInstance(): SpaceContext {
