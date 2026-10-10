@@ -276,3 +276,55 @@ test('conflito exige nova prévia/decisão; 429 e CSRF conservam tentativa', asy
     expect(calls).toHaveLength(3);
     expect(flow.getSnapshot().retryAt).toBeGreaterThan(Date.now());
 });
+
+test('resposta inválida mantém resultado incerto e prévia descarta campos extras', async () => {
+    const { flow, transport } = fixture();
+    transport.preview = async () =>
+        ({ ...preview, token }) as InvitationPreviewResponse;
+    await flow.loadPreview(transport);
+    expect(JSON.stringify(flow.getSnapshot()).includes(token)).toBe(false);
+    transport.respond = async () => ({
+        decision: 'REJECT',
+        invitation: {
+            id: 'outro-convite',
+            status: 'REJECTED',
+            resolvedAt: '2026-10-09T00:00:00Z',
+        },
+        spaceId: 'space',
+        actorMembership: null,
+        replayed: false,
+    });
+    await flow.decide('REJECT', transport);
+    expect(flow.getSnapshot().phase).toBe('retry');
+    expect(flow.getSnapshot().hasAttempt).toBe(true);
+});
+
+test('cancelamento durante escrita preserva tentativa e descarta sucesso tardio da tela anterior', async () => {
+    const { flow, transport, calls } = fixture();
+    await flow.loadPreview(transport);
+    const respond = transport.respond;
+    let finish!: () => void;
+    let started!: () => void;
+    const ready = new Promise<void>((resolve) => {
+        started = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+        finish = resolve;
+    });
+    transport.respond = async (...args) => {
+        started();
+        await release;
+        return respond(...args);
+    };
+    const pending = flow.decide('REJECT', transport);
+    await ready;
+    flow.cancelRequests();
+    expect(flow.getSnapshot().phase).toBe('retry');
+    finish();
+    await pending;
+    expect(flow.getSnapshot().phase).toBe('retry');
+    transport.respond = respond;
+    await flow.retry(transport);
+    expect(calls[1]).toEqual(calls[0]);
+    expect(flow.getSnapshot().phase).toBe('rejected');
+});

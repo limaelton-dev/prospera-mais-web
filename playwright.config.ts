@@ -18,8 +18,10 @@ export default defineConfig({
     outputDir: 'test-results',
     use: {
         baseURL: webUrl,
-        trace: 'retain-on-failure',
-        screenshot: 'only-on-failure',
+        // Creator and recipient journeys both handle invitation secrets.
+        trace: 'off',
+        screenshot: 'off',
+        video: 'off',
     },
     projects: [
         {

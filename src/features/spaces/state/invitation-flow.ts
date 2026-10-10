@@ -12,6 +12,8 @@ export const unavailableInvitationMessage =
 type Attempt = {
     key: string;
     personId: string;
+    invitationId: string;
+    spaceId: string;
     input: RespondToInvitationInput;
 };
 
@@ -206,8 +208,40 @@ export class InvitationFlow {
                 csrf,
                 run.controller.signal,
             );
-            if (this.isCurrent(run, transport))
-                this.update({ phase: 'review', preview, retryAt: 0 });
+            if (!this.isCurrent(run, transport)) return;
+            if (
+                !preview ||
+                typeof preview.invitation?.id !== 'string' ||
+                preview.invitation.status !== 'PENDING' ||
+                !Number.isFinite(Date.parse(preview.invitation.expiresAt)) ||
+                typeof preview.space?.id !== 'string' ||
+                typeof preview.space.label !== 'string' ||
+                !Number.isSafeInteger(preview.space.version) ||
+                preview.space.version < 1 ||
+                typeof preview.invitedBy?.displayName !== 'string' ||
+                typeof preview.canRespond !== 'boolean'
+            ) {
+                throw new Error('Resposta inválida.');
+            }
+            // Copy only the documented minimum, even if a server adds fields.
+            this.update({
+                phase: 'review',
+                retryAt: 0,
+                preview: {
+                    invitation: {
+                        id: preview.invitation.id,
+                        status: 'PENDING',
+                        expiresAt: preview.invitation.expiresAt,
+                    },
+                    space: {
+                        id: preview.space.id,
+                        label: preview.space.label,
+                        version: preview.space.version,
+                    },
+                    invitedBy: { displayName: preview.invitedBy.displayName },
+                    canRespond: preview.canRespond,
+                },
+            });
         } catch (error) {
             if (this.isCurrent(run, transport))
                 await this.handleError(error, transport, false);
@@ -231,6 +265,8 @@ export class InvitationFlow {
         this.attempt = {
             key: crypto.randomUUID(),
             personId,
+            invitationId: this.snapshot.preview.invitation.id,
+            spaceId: this.snapshot.preview.space.id,
             input: {
                 token: this.token,
                 decision,
@@ -259,11 +295,20 @@ export class InvitationFlow {
             );
             if (!this.isCurrent(run, transport)) return;
             if (
+                !result ||
                 result.decision !== attempt.input.decision ||
+                result.invitation?.id !== attempt.invitationId ||
+                result.spaceId !== attempt.spaceId ||
+                typeof result.replayed !== 'boolean' ||
+                !Number.isFinite(Date.parse(result.invitation.resolvedAt)) ||
                 result.invitation.status !==
                     (result.decision === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED') ||
                 (result.decision === 'ACCEPT' &&
-                    result.actorMembership?.personId !== run.personId)
+                    (result.actorMembership?.personId !== run.personId ||
+                        result.actorMembership.status !== 'ACTIVE' ||
+                        typeof result.actorMembership.id !== 'string')) ||
+                (result.decision === 'REJECT' &&
+                    result.actorMembership !== null)
             ) {
                 throw new Error('Resposta inválida.');
             }
