@@ -39,6 +39,7 @@ export type InvitationFlowTransport = {
     currentPerson: () => string | null;
     csrf: () => Promise<string>;
     invalidateCsrf: () => Promise<void>;
+    expireSession?: () => void;
     preview: (
         token: string,
         csrf: string,
@@ -91,6 +92,16 @@ export class InvitationFlow {
         this.generation++;
         this.controller?.abort();
         this.controller = null;
+        if (this.snapshot.phase === 'sending') {
+            this.update({
+                phase: 'retry',
+                preview: null,
+                message:
+                    'Não foi possível confirmar o resultado. Repita a mesma tentativa para recuperá-lo.',
+            });
+        } else if (this.snapshot.phase === 'loading') {
+            this.update({ phase: 'captured', preview: null });
+        }
     }
 
     clear(): void {
@@ -286,6 +297,7 @@ export class InvitationFlow {
                     message:
                         'Sua sessão expirou. Entre novamente com a mesma conta para continuar.',
                 });
+                transport.expireSession?.();
                 return;
             }
             if (error.code === 'INVALID_CSRF_TOKEN') {

@@ -63,6 +63,7 @@ export async function apiRequest<T = unknown>(
         method: options.method ?? 'GET',
         credentials: 'include',
         cache: 'no-store',
+        referrerPolicy: 'no-referrer',
         headers,
         body:
             options.body === undefined

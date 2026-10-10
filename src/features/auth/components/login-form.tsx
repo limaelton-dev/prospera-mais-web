@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { ApiError } from '@/lib/api/api-error';
 import { login, type LoginInput } from '@/lib/api/login';
+import { useInvitationFlowContext } from '@/features/spaces/context/invitation-flow-provider';
 
 import { useCsrf } from '../hooks/use-csrf';
 import { getAuthErrorMessage } from '../utils/get-auth-error-message';
@@ -17,6 +18,7 @@ export function LoginForm() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const csrf = useCsrf();
+    const invitationFlow = useInvitationFlowContext();
     const formRef = useRef<HTMLFormElement>(null);
     const submittingRef = useRef(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,7 +35,10 @@ export function LoginForm() {
             await setAuthenticatedContext(queryClient, context);
             await csrf.invalidateToken();
             formRef.current?.reset();
-            router.replace('/');
+            invitationFlow.syncPerson(context.person.id);
+            router.replace(
+                invitationFlow.hasPendingInvitation() ? '/invitations' : '/',
+            );
         },
         onError: async (error) => {
             setErrorMessage(

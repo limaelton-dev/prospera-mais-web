@@ -18,6 +18,13 @@ export function useInvitationFlow(flow: InvitationFlow) {
         currentPerson: () => getAuthenticatedPersonId(client),
         csrf: () => csrf.ensureToken(),
         invalidateCsrf: () => csrf.invalidateToken(),
+        expireSession: () => {
+            void client.cancelQueries(
+                { queryKey: ['auth', 'me'], exact: true },
+                { revert: false },
+            );
+            client.setQueryData(['auth', 'me'], null);
+        },
         preview: previewInvitation,
         respond: respondToInvitation,
     };
