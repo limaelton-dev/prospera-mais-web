@@ -26,6 +26,8 @@ function clearSpacesCache(client: QueryClient): void {
     );
 
     client.removeQueries({ queryKey: spacesQueryKeys.all });
+    void client.cancelQueries({ queryKey: ['finances'] }, { revert: false });
+    client.removeQueries({ queryKey: ['finances'] });
 }
 
 export function watchSpacesSession(client: QueryClient): () => void {

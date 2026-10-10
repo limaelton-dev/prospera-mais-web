@@ -87,6 +87,11 @@ function AuthenticatedSpaceContext({
                 ),
             cancelDetails: () => {
                 void client.cancelQueries(
+                    { queryKey: ['finances', personId] },
+                    { revert: false },
+                );
+                client.removeQueries({ queryKey: ['finances', personId] });
+                void client.cancelQueries(
                     {
                         predicate: (query) =>
                             query.queryKey[0] === 'spaces' &&
@@ -104,6 +109,11 @@ function AuthenticatedSpaceContext({
                     details,
                 ),
             revoke: (id) => {
+                void client.cancelQueries(
+                    { queryKey: ['finances', personId, id] },
+                    { revert: false },
+                );
+                client.removeQueries({ queryKey: ['finances', personId, id] });
                 void client.cancelQueries(
                     { queryKey: spacesQueryKeys.detail(personId, id) },
                     { revert: false },

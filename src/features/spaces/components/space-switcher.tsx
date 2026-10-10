@@ -38,8 +38,17 @@ export function SpaceSwitcher() {
         )
             return;
         const selected = context.getSnapshot().activeSpaceId;
-        if (/^\/spaces\/(?!new$)[^/]+$/.test(currentPath.current) && selected)
-            router.replace(`/spaces/${selected}`);
+        if (
+            /^\/spaces\/(?!new$)[^/]+(?:\/settings)?$/.test(
+                currentPath.current,
+            ) &&
+            selected
+        ) {
+            const settings =
+                currentPath.current.endsWith('/settings') &&
+                context.getSnapshot().currentSpace?.type === 'SHARED';
+            router.replace(`/spaces/${selected}${settings ? '/settings' : ''}`);
+        }
     }
     const loading =
         space.phase === 'initializing' || space.phase === 'switching';

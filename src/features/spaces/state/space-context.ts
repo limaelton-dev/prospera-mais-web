@@ -21,6 +21,7 @@ export type SpaceContextSnapshot = {
     message: string | null;
     switchBlocked: boolean;
     routeIssue: { spaceId: string; message: string } | null;
+    accessFallback: boolean;
 };
 
 export type SpaceContextTransport = {
@@ -52,6 +53,7 @@ const empty: SpaceContextSnapshot = {
     message: null,
     switchBlocked: false,
     routeIssue: null,
+    accessFallback: false,
 };
 export const unavailableSpaceMessage =
     'Este espaço não está mais disponível. Você voltou para Meu espaço.';
@@ -77,6 +79,11 @@ export class SpaceContext {
     private retryMessage: string | null = null;
     private retryRoute = false;
     private lastSpace: SpaceSummary | null = null;
+    private discardedDraft = false;
+
+    notifyDraftDiscarded(): void {
+        this.discardedDraft = true;
+    }
 
     constructor(
         readonly personId: string,
@@ -231,6 +238,7 @@ export class SpaceContext {
             activeSpaceId: null,
             message: null,
             routeIssue: null,
+            accessFallback: false,
         });
         try {
             let items = this.snapshot.items;
@@ -318,8 +326,14 @@ export class SpaceContext {
                 initialized: true,
                 activeSpaceId: target,
                 currentSpace: details.space,
-                message,
+                accessFallback: message === unavailableSpaceMessage,
+                message:
+                    message ??
+                    (this.discardedDraft
+                        ? 'A edição da regra de acerto foi descartada ao sair do espaço.'
+                        : null),
             });
+            this.discardedDraft = false;
             return true;
         } catch (error) {
             if (!current()) return false;
