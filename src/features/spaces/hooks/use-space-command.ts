@@ -10,7 +10,12 @@ import { issueSpaceInvitation } from '@/lib/api/issue-space-invitation';
 import { replaceSpaceInvitation } from '@/lib/api/replace-space-invitation';
 
 import { spacesQueryKeys } from '../cache/spaces-query-keys';
-import { getAuthenticatedPersonId } from '../cache/spaces-session';
+import {
+    getAuthenticatedPersonId,
+    getSpacesSessionEpoch,
+} from '../cache/spaces-session';
+import { useSpaceContextInstance } from '../context/space-context-provider';
+import type { SpaceContextCapture } from '../state/space-context';
 import type { InvitationCommandResponse } from '../types/spaces-responses';
 import { getSpacesErrorMessage } from '../utils/get-spaces-error-message';
 
@@ -34,6 +39,9 @@ export type SpaceWrite =
 type Attempt = {
     key: string;
     command: SpaceWrite;
+    personId: string;
+    sessionEpoch: number;
+    context: SpaceContextCapture;
 };
 
 async function send(
@@ -83,11 +91,13 @@ export function useSpaceCommand(
 ) {
     const client = useQueryClient();
     const csrf = useCsrf();
+    const spaceContext = useSpaceContextInstance();
 
     const mounted = useRef(false);
     const locked = useRef(false);
     const attempt = useRef<Attempt | null>(null);
     const controller = useRef<AbortController | null>(null);
+    const releaseSwitchLock = useRef<(() => void) | null>(null);
 
     const [error, setError] = useState<string | null>(null);
     const [canRetry, setCanRetry] = useState(false);
@@ -98,6 +108,8 @@ export function useSpaceCommand(
         return () => {
             mounted.current = false;
             controller.current?.abort();
+            releaseSwitchLock.current?.();
+            releaseSwitchLock.current = null;
         };
     }, []);
 
@@ -109,6 +121,18 @@ export function useSpaceCommand(
         );
     }
 
+    function isAttemptSession(currentAttempt: Attempt): boolean {
+        return (
+            getAuthenticatedPersonId(client) === currentAttempt.personId &&
+            getSpacesSessionEpoch(client) === currentAttempt.sessionEpoch
+        );
+    }
+
+    function releaseLock(): void {
+        releaseSwitchLock.current?.();
+        releaseSwitchLock.current = null;
+    }
+
     const mutation = useMutation<void, Error, Attempt>({
         mutationFn: async (currentAttempt): Promise<void> => {
             const abortController = new AbortController();
@@ -116,7 +140,7 @@ export function useSpaceCommand(
 
             const token = await csrf.ensureToken();
 
-            if (!isCurrentPerson()) {
+            if (!isCurrentPerson() || !isAttemptSession(currentAttempt)) {
                 return;
             }
 
@@ -126,15 +150,31 @@ export function useSpaceCommand(
                 abortController.signal,
             );
 
-            if (!isCurrentPerson()) {
+            if (!isAttemptSession(currentAttempt)) {
                 return;
             }
 
             await client.invalidateQueries({
-                queryKey: spacesQueryKeys.all,
+                queryKey: spacesQueryKeys.list(currentAttempt.personId),
+                exact: true,
+            });
+            const destination =
+                currentAttempt.command.operation === 'create'
+                    ? result.space.id
+                    : currentAttempt.command.spaceId;
+            await client.invalidateQueries({
+                queryKey: spacesQueryKeys.detail(
+                    currentAttempt.personId,
+                    destination,
+                ),
+                exact: true,
             });
 
-            if (isCurrentPerson()) {
+            if (
+                isCurrentPerson() &&
+                isAttemptSession(currentAttempt) &&
+                spaceContext.isCurrent(currentAttempt.context)
+            ) {
                 onCompleted(result);
             }
         },
@@ -142,16 +182,17 @@ export function useSpaceCommand(
         networkMode: 'always',
         gcTime: 0,
 
-        onSuccess: () => {
+        onSuccess: (_result, currentAttempt) => {
             attempt.current = null;
+            releaseLock();
 
-            if (isCurrentPerson()) {
+            if (isCurrentPerson() && isAttemptSession(currentAttempt)) {
                 setCanRetry(false);
             }
         },
 
-        onError: async (failure) => {
-            if (!isCurrentPerson()) {
+        onError: async (failure, currentAttempt) => {
+            if (!isCurrentPerson() || !isAttemptSession(currentAttempt)) {
                 return;
             }
 
@@ -161,7 +202,7 @@ export function useSpaceCommand(
                     { revert: false },
                 );
 
-                if (isCurrentPerson()) {
+                if (isCurrentPerson() && isAttemptSession(currentAttempt)) {
                     client.setQueryData(['auth', 'me'], null);
                 }
 
@@ -184,13 +225,14 @@ export function useSpaceCommand(
 
             if (!retryable) {
                 attempt.current = null;
+                releaseLock();
             }
 
             if (csrfRejected) {
                 try {
                     await csrf.refreshToken();
                 } catch {
-                    if (isCurrentPerson()) {
+                    if (isCurrentPerson() && isAttemptSession(currentAttempt)) {
                         setError(
                             'Não foi possível preparar uma nova tentativa. Confira sua conexão e tente novamente.',
                         );
@@ -205,7 +247,8 @@ export function useSpaceCommand(
                 [403, 404, 409].includes(failure.status)
             ) {
                 await client.invalidateQueries({
-                    queryKey: spacesQueryKeys.all,
+                    queryKey: spacesQueryKeys.list(personId),
+                    exact: true,
                 });
             }
         },
@@ -217,11 +260,16 @@ export function useSpaceCommand(
     });
 
     function execute(currentAttempt: Attempt): void {
-        if (locked.current || !isCurrentPerson()) {
+        if (
+            locked.current ||
+            !isCurrentPerson() ||
+            !isAttemptSession(currentAttempt)
+        ) {
             return;
         }
 
         locked.current = true;
+        releaseSwitchLock.current ??= spaceContext.lock();
         attempt.current = currentAttempt;
         setError(null);
         setCanRetry(false);
@@ -233,9 +281,14 @@ export function useSpaceCommand(
             return;
         }
 
+        const captured = spaceContext.capture();
+        if (!captured || personId === null) return;
         execute({
             key: crypto.randomUUID(),
-            command,
+            command: { ...command },
+            personId,
+            sessionEpoch: getSpacesSessionEpoch(client),
+            context: captured,
         });
     }
 

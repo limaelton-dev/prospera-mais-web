@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { AuthGate } from '@/features/auth/components/auth-gate';
+import { SpaceContextProvider } from '@/features/spaces/context/space-context-provider';
 import styles from '@/features/auth/components/authenticated-shell.module.css';
 
 type AuthenticatedLayoutProps = Readonly<{
@@ -12,15 +13,17 @@ export default function AuthenticatedLayout({
 }: AuthenticatedLayoutProps) {
     return (
         <AuthGate>
-            <div className={styles.shell}>
-                <header className={styles.header}>
-                    <div className={styles.headerContent}>
-                        <span className={styles.brand}>Prospera Mais</span>
-                    </div>
-                </header>
+            <SpaceContextProvider>
+                <div className={styles.shell}>
+                    <header className={styles.header}>
+                        <div className={styles.headerContent}>
+                            <span className={styles.brand}>Prospera Mais</span>
+                        </div>
+                    </header>
 
-                <main className={styles.content}>{children}</main>
-            </div>
+                    <main className={styles.content}>{children}</main>
+                </div>
+            </SpaceContextProvider>
         </AuthGate>
     );
 }

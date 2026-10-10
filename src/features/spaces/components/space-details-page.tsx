@@ -333,7 +333,9 @@ function SpaceDetails({
                 className={styles.dialog}
                 aria-labelledby="replace-title"
                 aria-describedby="replace-description"
-                onClose={() => setReplacement(null)}
+                onClose={() => {
+                    if (!dialog.current?.open) setReplacement(null);
+                }}
                 onCancel={() => setReplacement(null)}
             >
                 <div className={styles.stack}>
