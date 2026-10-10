@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { ApiError } from '@/lib/api/api-error';
 import { logout } from '@/lib/api/logout';
+import { useInvitationFlowContext } from '@/features/spaces/context/invitation-flow-provider';
 
 import { authenticatedContextQueryOptions } from '../hooks/use-authenticated-context';
 import { useCsrf } from '../hooks/use-csrf';
@@ -15,6 +16,7 @@ import styles from './logout-button.module.css';
 export function LogoutButton() {
     const queryClient = useQueryClient();
     const csrf = useCsrf();
+    const invitationFlow = useInvitationFlowContext();
     const submittingRef = useRef(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -82,6 +84,7 @@ export function LogoutButton() {
         }
 
         setErrorMessage(null);
+        invitationFlow.clear();
         submittingRef.current = true;
         signOut.mutate();
     }

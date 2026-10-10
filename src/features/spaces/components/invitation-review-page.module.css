@@ -1,0 +1,14 @@
+.page {
+    width: min(38rem, 100%);
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.title:focus {
+    outline: none;
+}
+
+.page a:focus-visible {
+    outline: 3px solid #2563eb;
+    outline-offset: 3px;
+}

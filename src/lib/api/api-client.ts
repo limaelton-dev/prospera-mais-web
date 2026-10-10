@@ -63,6 +63,7 @@ export async function apiRequest<T = unknown>(
         method: options.method ?? 'GET',
         credentials: 'include',
         cache: 'no-store',
+        referrerPolicy: 'no-referrer',
         headers,
         body:
             options.body === undefined
@@ -96,8 +97,18 @@ export async function apiRequest<T = unknown>(
                 ? error.message
                 : 'Não foi possível concluir a solicitação.',
             error.details ?? {},
+            parseRetryAfter(response.headers.get('Retry-After')),
         );
     }
 
     return payload as T;
+}
+
+function parseRetryAfter(value: string | null): number | null {
+    if (value === null) return null;
+    if (/^\d+$/.test(value)) return Number(value);
+    const date = Date.parse(value);
+    return Number.isFinite(date)
+        ? Math.max(0, Math.ceil((date - Date.now()) / 1000))
+        : null;
 }
