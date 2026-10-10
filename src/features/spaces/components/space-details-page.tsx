@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useAuthenticatedContext } from '@/features/auth/hooks/use-authenticated-context';
@@ -256,6 +257,9 @@ function SpaceDetails({
                             : 'Duas pessoas participam deste espaço.'}
                     </p>
 
+                    <Link href={`/spaces/${spaceId}/settings`}>
+                        Configurações do espaço
+                    </Link>
                     {data.invitation ? (
                         <section
                             className={styles.panel}

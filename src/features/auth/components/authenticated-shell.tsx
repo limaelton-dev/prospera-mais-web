@@ -29,11 +29,29 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
         setRenderedPath(pathname);
         setValidatedPath(null);
     }
-    const detailId = /^\/spaces\/([^/]+)$/.exec(pathname)?.[1];
+    const detailId = /^\/spaces\/([^/]+)(?:\/settings)?$/.exec(pathname)?.[1];
     const routeSpaceId = detailId && detailId !== 'new' ? detailId : null;
     useEffect(() => {
         if (space.phase !== 'ready') return;
         if (visitedPath.current === pathname) {
+            if (
+                routeSpaceId &&
+                space.activeSpaceId &&
+                space.activeSpaceId !== routeSpaceId &&
+                space.accessFallback
+            ) {
+                const generation = context.getSnapshot().generation;
+                void Promise.resolve().then(() => {
+                    const next = context.getSnapshot();
+                    if (
+                        currentPath.current === pathname &&
+                        next.generation === generation &&
+                        next.phase === 'ready' &&
+                        next.activeSpaceId
+                    )
+                        router.replace(`/spaces/${next.activeSpaceId}`);
+                });
+            }
             if (
                 routeSpaceId &&
                 space.activeSpaceId === routeSpaceId &&
@@ -83,6 +101,7 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
         router,
         space.activeSpaceId,
         space.phase,
+        space.accessFallback,
         space.routeIssue,
     ]);
     const routeIssue =
@@ -104,7 +123,17 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
                     <SpaceSwitcher />
                 </div>
             </header>
-            <main className={styles.content}>
+            <main
+                className={styles.content}
+                onClickCapture={(event) => {
+                    if (
+                        space.switchBlocked &&
+                        event.target instanceof Element &&
+                        event.target.closest('a')
+                    )
+                        event.preventDefault();
+                }}
+            >
                 {routeIssue && (
                     <section>
                         <h1>Espaço indisponível</h1>
